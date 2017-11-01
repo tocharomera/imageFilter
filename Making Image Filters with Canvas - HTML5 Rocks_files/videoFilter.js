@@ -1,0 +1,79 @@
+function sobel (px) {
+    px = greyScale(px);
+        var vertical = convoluteFloat32(px,
+        [-1, -2, -1,
+          0, 0, 0,
+          1, 2, 1], false);
+        var horizontal = convoluteFloat32(px,
+        [-1, 0, 1,
+         -2, 0, 2,
+         -1, 0, 1], false);
+        var id = createImageData(vertical.width, vertical.height);
+        for (var i = 0; i < id.data.length; i += 4) {
+            var v = Math.abs(vertical.data[i]);
+            id.data[i] = v;
+            var h = Math.abs(horizontal.data[i]);
+            id.data[i + 1] = h
+            id.data[i + 2] = (v + h) / 4;
+            id.data[i + 3] = 255;
+        }
+        return id;
+    }
+
+ function convoluteFloat32 (pixels, weights, opaque) {
+    var side = Math.round(Math.sqrt(weights.length));
+    var halfSide = Math.floor(side / 2);
+
+    var src = pixels.data;
+    var sw = pixels.width;
+    var sh = pixels.height;
+
+    var w = sw;
+    var h = sh;
+    var output = {
+        width: w, height: h, data: new Float32Array(w * h * 4)
+    };
+    var dst = output.data;
+
+    var alphaFac = opaque ? 1 : 0;
+
+    for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+            var sy = y;
+            var sx = x;
+            var dstOff = (y * w + x) * 4;
+            var r = 0, g = 0, b = 0, a = 0;
+            for (var cy = 0; cy < side; cy++) {
+                for (var cx = 0; cx < side; cx++) {
+                    var scy = Math.min(sh - 1, Math.max(0, sy + cy - halfSide));
+                    var scx = Math.min(sw - 1, Math.max(0, sx + cx - halfSide));
+                    var srcOff = (scy * sw + scx) * 4;
+                    var wt = weights[cy * side + cx];
+                    r += src[srcOff] * wt;
+                    g += src[srcOff + 1] * wt;
+                    b += src[srcOff + 2] * wt;
+                    a += src[srcOff + 3] * wt;
+                }
+            }
+            dst[dstOff] = r;
+            dst[dstOff + 1] = g;
+            dst[dstOff + 2] = b;
+            dst[dstOff + 3] = a + alphaFac * (255 - a);
+        }
+    }
+    return output;
+}
+
+function draw() {
+    // First, draw it into the backing canvas
+    backcontext.drawImage(video, 0, 0, video.width, video.height);
+
+     // Grab the pixel data from the backing canvas
+    var idata = backcontext.getImageData(0, 0, video.width, video.height);
+
+    idata = sobel(idata);
+    context.putImageData(idata, 0, 0);
+
+    // Start over!
+    setTimeout(draw, 50);
+}
